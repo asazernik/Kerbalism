@@ -347,7 +347,7 @@ namespace KERBALISM
 					{
 						foreach (ProtoCrewMember c in Lib.CrewList(v))
 						{
-							if (c.experienceTrait.Effects.Find(k => k.Name == converter.ExperienceEffect) != null)
+							if (c.experienceTrait.Effects.Exists(k => k.Name == converter.ExperienceEffect))
 							{
 								exp_level = Math.Max(exp_level, c.experienceLevel);
 							}
@@ -396,7 +396,7 @@ namespace KERBALISM
 					{
 						foreach (ProtoCrewMember c in Lib.CrewList(v))
 						{
-							if (c.experienceTrait.Effects.Find(k => k.Name == harvester.ExperienceEffect) != null)
+							if (c.experienceTrait.Effects.Exists(k => k.Name == harvester.ExperienceEffect))
 							{
 								exp_level = Math.Max(exp_level, c.experienceLevel);
 							}
@@ -477,7 +477,7 @@ namespace KERBALISM
 						{
 							foreach (ProtoCrewMember c in Lib.CrewList(v))
 							{
-								if (c.experienceTrait.Effects.Find(k => k.Name == asteroid_drill.ExperienceEffect) != null)
+								if (c.experienceTrait.Effects.Exists(k => k.Name == asteroid_drill.ExperienceEffect))
 								{
 									exp_level = Math.Max(exp_level, c.experienceLevel);
 								}
