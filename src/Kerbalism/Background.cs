@@ -449,52 +449,62 @@ namespace KERBALISM
 			// if active
 			if (Lib.Proto.GetBool(m, "IsActivated"))
 			{
+				// undo stock behavior by forcing last_update_time to now
+				Lib.Proto.Set(m, "lastUpdateTime", Planetarium.GetUniversalTime());
+
 				// get asteroid data
 				ProtoPartModuleSnapshot asteroid_info = null;
-				ProtoPartModuleSnapshot asteroid_resource = null;
+				List<ProtoPartModuleSnapshot> asteroid_resources = null;
 				foreach (ProtoPartSnapshot pp in v.protoVessel.protoPartSnapshots)
 				{
-					if (asteroid_info == null) asteroid_info = pp.modules.Find(k => k.moduleName == "ModuleAsteroidInfo");
-					if (asteroid_resource == null) asteroid_resource = pp.modules.Find(k => k.moduleName == "ModuleAsteroidResource");
+					asteroid_info = pp.modules.Find(k => k.moduleName == "ModuleAsteroidInfo");
+					if (asteroid_info != null)
+					{
+					    // going to assume that ModuleAsteroidInfo and ModuleAsteroidResource always go together
+						asteroid_resources = pp.modules.FindAll(k => k.moduleName == "ModuleAsteroidResource");
+						break;
+					}
 				}
 
-				// if there is actually an asteroid attached to this active asteroid drill (it should)
-				if (asteroid_info != null && asteroid_resource != null)
+				// do nothing if no asteroid attached to this active asteroid drill (there should be)
+				if (asteroid_info == null) return;
+				// get some data
+				double mass_threshold = Lib.Proto.GetDouble(asteroid_info, "massThresholdVal");
+				double mass = Lib.Proto.GetDouble(asteroid_info, "currentMassVal");
+				if (mass <= mass_threshold) return; // do nothing if asteroid depleted of all resources
+
+				// deduce crew bonus
+				int exp_level = -1;
+				if (asteroid_drill.UseSpecialistBonus)
 				{
-					// get some data
-					double mass_threshold = Lib.Proto.GetDouble(asteroid_info, "massThresholdVal");
-					double mass = Lib.Proto.GetDouble(asteroid_info, "currentMassVal");
+					foreach (ProtoCrewMember c in Lib.CrewList(v))
+					{
+						if (c.experienceTrait.Effects.Exists(k => k.Name == asteroid_drill.ExperienceEffect))
+						{
+							exp_level = Math.Max(exp_level, c.experienceLevel);
+						}
+					}
+				}
+
+				double exp_bonus = exp_level < 0
+				? asteroid_drill.EfficiencyBonus * asteroid_drill.SpecialistBonusBase
+				: asteroid_drill.EfficiencyBonus * (asteroid_drill.SpecialistBonusBase + (asteroid_drill.SpecialistEfficiencyFactor * (exp_level + 1)));
+
+				ResourceRecipe recipe = new ResourceRecipe(ResourceBroker.StockDrill);
+
+
+				foreach (ProtoPartModuleSnapshot asteroid_resource in asteroid_resources)
+				{
 					double abundance = Lib.Proto.GetDouble(asteroid_resource, "abundance");
 					string res_name = Lib.Proto.GetString(asteroid_resource, "resourceName");
 					double res_density = PartResourceLibrary.Instance.GetDefinition(res_name).density;
-
-					// if asteroid isn't depleted
-					if (mass > mass_threshold && abundance > double.Epsilon)
+					if (abundance > double.Epsilon)
 					{
-						// deduce crew bonus
-						int exp_level = -1;
-						if (asteroid_drill.UseSpecialistBonus)
-						{
-							foreach (ProtoCrewMember c in Lib.CrewList(v))
-							{
-								if (c.experienceTrait.Effects.Exists(k => k.Name == asteroid_drill.ExperienceEffect))
-								{
-									exp_level = Math.Max(exp_level, c.experienceLevel);
-								}
-							}
-						}
-						double exp_bonus = exp_level < 0
-						? asteroid_drill.EfficiencyBonus * asteroid_drill.SpecialistBonusBase
-						: asteroid_drill.EfficiencyBonus * (asteroid_drill.SpecialistBonusBase + (asteroid_drill.SpecialistEfficiencyFactor * (exp_level + 1)));
-
 						// determine resource extracted
 						double res_amount = abundance * asteroid_drill.Efficiency * exp_bonus * elapsed_s;
 
 						// transform EC into mined resource
-						ResourceRecipe recipe = new ResourceRecipe(ResourceBroker.StockDrill);
-						recipe.AddInput("ElectricCharge", asteroid_drill.PowerConsumption * elapsed_s);
 						recipe.AddOutput(res_name, res_amount, true);
-						resources.AddRecipe(recipe);
 
 						// if there was ec
 						// note: comparing against amount in previous simulation step
@@ -506,8 +516,11 @@ namespace KERBALISM
 					}
 				}
 
-				// undo stock behavior by forcing last_update_time to now
-				Lib.Proto.Set(m, "lastUpdateTime", Planetarium.GetUniversalTime());
+				if (recipe.outputs.Count > 0) // only deduct EC if some resource was extracted
+				{
+					recipe.AddInput("ElectricCharge", asteroid_drill.PowerConsumption * elapsed_s);
+					resources.AddRecipe(recipe);
+				}
 			}
 		}
 
