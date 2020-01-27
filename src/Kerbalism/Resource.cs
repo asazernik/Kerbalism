@@ -1099,6 +1099,7 @@ namespace KERBALISM
 		/// </summary>
 		private bool ExecuteRecipeStep(Vessel v, VesselResources resources)
 		{
+			// TODO: Add support for "virtual" resources? like asteroid mass
 			// determine worst input ratio
 			// - pure input recipes can just underflow
 			double worst_input = left;
